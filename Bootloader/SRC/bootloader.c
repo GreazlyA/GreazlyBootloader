@@ -13,6 +13,7 @@ volatile const int mainRestartFlag __attribute__ ((section (".ResetartFlagSectio
 
 #define FWUPGRADE_FLASH_IMAGE_BASE_ADDRESS 	(uint32_t)0x28000
 #define FWUPGRADE_FLASH_APP_IMAGE_START		(uint32_t)0x2000
+#define FLASH_SECTOR_SIZE					(uint32_t)(8*1024)
 
 // void (*ApplicationStartFunctionPtr)() = (uint8_t*)0x8004194;
 
