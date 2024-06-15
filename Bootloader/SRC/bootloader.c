@@ -68,6 +68,8 @@ void  Bootloader()
 			if(MyCalculatedCrc32 != OtaImageStructure.ImageCrc32){
 				bootloaderPrint("Application CRC32 fail, copy spi to app\n\r");
 				mainImageCopy(OtaImageStructure.ImageLength);
+				// Clear the FOTA image header
+				MSC_ErasePage(FWUPGRADE_FLASH_IMAGE_BASE_ADDRESS) ;
 				NVIC_SystemReset();
 				} else {
 					bootloaderPrint("Application CRC32 OK, go to app\n\r");
