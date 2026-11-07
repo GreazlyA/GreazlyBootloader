@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="ASCII"?>
 <model:MDescriptors xmlns:model="http://www.silabs.com/ss/Studio.ecore">
-  <descriptors name="Bootloader_6">
-    <properties key="projectCommon.sdkId" value="com.silabs.sdk.stack.super:4.4.1._-1031918845"/>
-    <properties key="universalConfig.relativeWorkspacePath" value="..\GreazlyBootloaderProject.slcw"/>
+  <descriptors name="GreazlyBootloader">
+    <properties key="projectCommon.sdkId" value="com.silabs.sdk.stack.super:4.4.1._-127350002"/>
+    <properties key="universalConfig.relativeWorkspacePath" value="..\Bootloader_6.slcw"/>
     <properties key="universalConfig.generationDirectory" value=""/>
     <properties key="universalConfig.toolchainCompatibility" value="iar gcc"/>
     <properties key="universalConfig.incrementalOverwriteConfigs" value="false"/>
