@@ -2,10 +2,6 @@
 
 #include "main.h"
 
-
-
-uint8_t mainNewFwUpgradeImageCheck();
-void  Bootloader();
-
-
-
+/* Install a pending LoRa FOTA or legacy .ota image, then start the app.
+ * Does not return. */
+void Bootloader(void);
