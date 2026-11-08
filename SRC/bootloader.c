@@ -42,6 +42,7 @@ const lota_boot_info_t BootInfo = { LOTA_BOOT_INFO_MAGIC, BOOTLOADER_VERSION };
 #define BOOT_WDOG_PERSEL          15u
 
 #define BOOT_COPY_ATTEMPTS        3u
+#define BOOT_LFRCO_WAIT           2000000u  /* loops, about 1 s at most */
 
 #define RAM_START                 0x20000000UL
 #define RAM_END                   0x20008000UL
@@ -65,7 +66,13 @@ uint32_t lota_crc32(const uint8_t *data, uint32_t len)
 
 static void wdogStart(void)
 {
-    CMU->CLKEN0_SET = CMU_CLKEN0_WDOG0;
+    /* WDOG0 is clocked by the LFRCO (the CMU reset default). This bootloader
+     * has no SDK clock setup, so start the oscillator here; without it the
+     * watchdog never counts and SYNCBUSY never clears. */
+    CMU->CLKEN0_SET = CMU_CLKEN0_WDOG0 | CMU_CLKEN0_LFRCO;
+    LFRCO->CTRL_SET = LFRCO_CTRL_FORCEEN;
+    for (uint32_t i = 0; i < BOOT_LFRCO_WAIT && !(LFRCO->STATUS & LFRCO_STATUS_RDY); i++)
+        ;
     /* A watchdog still running from the app (if the reset kept it) is
      * left as it is and fed. */
     if (!(WDOG0->EN & WDOG_EN_EN) && !(WDOG0->STATUS & WDOG_STATUS_LOCK)) {
@@ -76,12 +83,12 @@ static void wdogStart(void)
 }
 
 
+/* Never waits: a clear still synchronizing to the LF clock is as good as a
+ * new one, and a watchdog without a clock must not stop the install. */
 static void wdogFeed(void)
 {
-    if (!(WDOG0->EN & WDOG_EN_EN))
+    if (!(WDOG0->EN & WDOG_EN_EN) || (WDOG0->SYNCBUSY & WDOG_SYNCBUSY_CMD))
         return;
-    while (WDOG0->SYNCBUSY & WDOG_SYNCBUSY_CMD)
-        ;
     WDOG0->CMD = WDOG_CMD_CLEAR;
 }
 

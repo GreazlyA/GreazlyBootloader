@@ -45,6 +45,8 @@ FAILED_TAG = 0xFA110000
 
 MSC_BASES = (0x40030000, 0x50030000)
 WDOG_BASES = (0x4A018000, 0x5A018000)
+LFRCO_PAGES = (0x40020000, 0x50020000)   # the LFRCO registers are at +0x4000
+LFRCO_CAN_START = True                   # False: the oscillator never gets ready
 AIRCR = 0xE000ED0C
 VTOR = 0xE000ED08
 
@@ -121,6 +123,8 @@ class Boot:
         self.last_feed = 0
         self.max_gap = 0
         self.msc = {"addrb": 0, "wren": False}
+        self.lfrco_on = False
+        self.wdog_cmd_pending = False
 
         uc = Uc(UC_ARCH_ARM, UC_MODE_THUMB | UC_MODE_MCLASS)
         uc.ctl_set_cpu_model(UC_CPU_ARM_CORTEX_M33)
@@ -133,7 +137,9 @@ class Boot:
         for base in (0x40000000, 0x50000000):            # peripherals (plain memory)
             for off in range(0, 0x100000, 0x10000):
                 a = base + off
-                if a not in MSC_BASES and not any(a == (m & ~0xFFFF) for m in MSC_BASES):
+                if a in LFRCO_PAGES:
+                    uc.mmio_map(a, 0x10000, self.lfrco_read, None, self.lfrco_write, None)
+                elif a not in MSC_BASES and not any(a == (m & ~0xFFFF) for m in MSC_BASES):
                     uc.mem_map(a, 0x10000)
         for m in MSC_BASES:
             uc.mmio_map(m, 0x4000, self.msc_read, None, self.msc_write, None)
@@ -276,12 +282,24 @@ class Boot:
             if value & (1 << 1):
                 self.erase(self.msc["addrb"])
 
-    # ---- watchdog model --------------------------------------------------------------------
+    # ---- LFRCO model: FORCEEN starts it, STATUS.RDY says it runs ------------------------------
+    def lfrco_read(self, uc, off, size, _):
+        if off & 0xFFF == 0x08 and 0x4000 <= off < 0x8000:
+            return 1 if self.lfrco_on else 0
+        return 0
+
+    def lfrco_write(self, uc, off, size, value, _):
+        if 0x4000 <= off < 0x8000 and off & 0xFFF == 0x04 and off & 0x3000 == 0x1000 and value & 1:
+            self.lfrco_on = LFRCO_CAN_START
+
+    # ---- watchdog model: without the LF clock a CMD stays in SYNCBUSY for ever ------------
     def wdog_read(self, uc, off, size, _):
         reg = off & 0xFFF
         if reg == 0x04:
             return 1 if self.wdog_en else 0
-        return 0                                       # STATUS, SYNCBUSY, LOCK: 0
+        if reg == 0x24:
+            return 1 if self.wdog_cmd_pending and not self.lfrco_on else 0
+        return 0                                       # STATUS, LOCK: 0
 
     def wdog_write(self, uc, off, size, value, _):
         reg, kind = off & 0xFFF, off & 0x3000
@@ -289,6 +307,7 @@ class Boot:
             self.wdog_en = True
             self.last_feed = self.insn
         elif reg == 0x0C and value & 1 and self.wdog_en:
+            self.wdog_cmd_pending = True
             self.last_feed = self.insn
 
 
@@ -407,6 +426,16 @@ def main():
         r.check("store left as received", bytes(dev.flash[STORE_ADDR:STORE_ADDR + len(lota)]) == lota)
         res, n = boot_until_app(dev)
         r.check("next boot starts the app directly", res == "app" and n == 1, res)
+
+    print("LF clock never starts")
+    global LFRCO_CAN_START
+    LFRCO_CAN_START = False
+    dev = new_device(bl_mem, old)
+    to_crc = put_request(dev, delta)
+    res, n = boot_until_app(dev)
+    LFRCO_CAN_START = True
+    r.check("watchdog without a clock does not stop the install",
+            res == "app" and slot_matches(dev, new), f"{res}, {n} boots")
 
     print("rejected requests (old app must stay)")
     def rejected(name, lota, app, expect_step, expect_code=None, rec_ok=True):

@@ -4,9 +4,14 @@
  * Keep in step with fw_lota.py: lzss_unpack() mirrors lota_src_get() and
  * patch_apply() mirrors lota_rebuild(). Every .lota the build makes is
  * rebuilt by that Python mirror before it is written.
+ *
+ * LOTA_CHECK_ONLY (defined by an includer before #include "lota.c") leaves
+ * out lota_rebuild() and its 4.4 KB of RAM: the app only checks files.
  ******************************************************************************/
 
 #include "lota.h"
+
+#ifndef LOTA_CHECK_ONLY
 
 typedef struct {
     const uint8_t *in;
@@ -36,6 +41,8 @@ typedef struct {
 } lota_out_t;
 
 static lota_out_t Out;
+
+#endif /* LOTA_CHECK_ONLY */
 
 
 static lota_header_t header_read(const uint8_t *p)
@@ -97,6 +104,8 @@ lota_result_t lota_check(const uint8_t *lota, uint32_t lota_size, uint32_t hw_id
     return LOTA_OK;
 }
 
+
+#ifndef LOTA_CHECK_ONLY
 
 static lota_result_t src_bits(uint8_t count, uint32_t *value)
 {
@@ -272,3 +281,5 @@ lota_result_t lota_rebuild(const uint8_t *lota, const uint8_t *old,
         return LOTA_ERR_TRAILING;
     return out_flush() == LOTA_OK ? LOTA_OK : LOTA_ERR_WRITE;
 }
+
+#endif /* LOTA_CHECK_ONLY */
